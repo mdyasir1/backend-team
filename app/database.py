@@ -1,18 +1,42 @@
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
-from app.config import DATABASE_URL
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
 
-engine = create_async_engine(DATABASE_URL, echo=True, future=True)
+DATABASE_URL = "postgresql://postgres:safiyarafi111@user-skills-db.cxc8uamw6vkx.ap-south-1.rds.amazonaws.com:5432/postgres"
 
-SessionLocal = sessionmaker(
-    bind=engine,
-    expire_on_commit=False,
-    autoflush=False,
-    class_=AsyncSession
-)
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 
-Base = declarative_base()
+def init_db():
+    with engine.connect() as conn:
+        conn.execute(text("DROP TABLE IF EXISTS user_skills;"))
+        conn.execute(text("DROP TABLE IF EXISTS skills;"))
+        conn.execute(text("DROP TABLE IF EXISTS users;"))
 
-async def get_db():
-    async with SessionLocal() as session:
-        yield session
+        conn.execute(text("""
+            CREATE TABLE users (
+                user_id SERIAL PRIMARY KEY,
+                username VARCHAR(100) NOT NULL,
+                email VARCHAR(100) NOT NULL UNIQUE,
+                location VARCHAR(100)
+            );
+        """))
+
+        conn.execute(text("""
+            CREATE TABLE skills (
+                skill_id SERIAL PRIMARY KEY,
+                skill_name VARCHAR(100) NOT NULL UNIQUE
+            );
+        """))
+
+        conn.execute(text("""
+            CREATE TABLE user_skills (
+                user_skill_id SERIAL PRIMARY KEY,
+                user_id INT NOT NULL,
+                skill_id INT NOT NULL,
+                CONSTRAINT fk_user FOREIGN KEY(user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+                CONSTRAINT fk_skill FOREIGN KEY(skill_id) REFERENCES skills(skill_id) ON DELETE CASCADE,
+                CONSTRAINT unique_user_skill UNIQUE(user_id, skill_id)
+            );
+        """))
+
+        conn.commit()

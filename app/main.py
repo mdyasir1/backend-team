@@ -1,26 +1,28 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from app.routers import submit, fetch
-from app.database import Base, engine
+from fastapi import FastAPI, Depends, HTTPException
+from sqlalchemy.orm import Session
+from app import schemas, crud
+from app.database import SessionLocal, init_db
 
-app = FastAPI(title="Form Submission Backend")
+# Initialize DB (recreate tables each run for testing)
+init_db()
 
-# Allow frontend requests
-origins = ["http://localhost:3000"]  # Update with actual frontend deployment URL
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app = FastAPI()
 
-# Auto-create DB tables
-@app.on_event("startup")
-async def startup_event():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+# Dependency: DB session
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
-# Include routers
-app.include_router(submit.router)
-app.include_router(fetch.router)
+@app.post("/submit-form", response_model=schemas.UserResponse)
+def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
+    try:
+        return crud.create_user(db, user)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/submissions", response_model=list[schemas.UserResponse])
+def read_users(db: Session = Depends(get_db)):
+    return crud.get_users(db)
