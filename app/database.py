@@ -1,7 +1,12 @@
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
+import os
+from dotenv import load_dotenv
 
-DATABASE_URL = "postgresql://postgres:safiyarafi111@user-skills-db.cxc8uamw6vkx.ap-south-1.rds.amazonaws.com:5432/postgres"
+load_dotenv()
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
