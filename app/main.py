@@ -26,3 +26,6 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
 @app.get("/submissions", response_model=list[schemas.UserResponse])
 def read_users(db: Session = Depends(get_db)):
     return crud.get_users(db)
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0' , port=8000)
