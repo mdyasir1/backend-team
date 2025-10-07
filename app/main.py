@@ -1,10 +1,10 @@
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app import schemas, crud
-from app.database import SessionLocal, init_db
+from app.database import SessionLocal
 
 # Initialize DB (recreate tables each run for testing)
-init_db()
+# init_db()
 
 app = FastAPI()
 
