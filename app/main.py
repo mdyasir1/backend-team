@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app import schemas, crud
 from app.database import SessionLocal
-
+import uvicorn
 # Initialize DB (recreate tables each run for testing)
 # init_db()
 
@@ -28,4 +28,4 @@ def read_users(db: Session = Depends(get_db)):
     return crud.get_users(db)
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0' , port=8000)
+    uvicorn.run('main:app',host='0.0.0.0' , port=8000, reload=True)
