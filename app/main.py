@@ -31,7 +31,7 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
         # crud.create_user returns a dict with status_code and message
         result = crud.create_user(db, user)
         
-        if result.get("status_code") == 409: # User already exists with same data/skills
+        if result.get("status_code") == 409: 
              raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=result.get("message")

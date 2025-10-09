@@ -3,16 +3,32 @@ from sqlalchemy import text
 from app import schemas
 from typing import Dict, Any, List
 
+def clean_and_flatten_skills(skills: List[str]) -> List[str]:
+    """
+    Takes a list of raw skill strings, splits any comma-separated entries, 
+    strips whitespace, converts to lowercase, and returns a unique, sorted list 
+    of individual skill names.
+    """
+    flat_skills = []
+    for skill_string in skills:
+        # Split by comma, then strip whitespace and convert to lowercase
+        parts = [part.strip().lower() for part in skill_string.split(',')]
+        flat_skills.extend(parts)
+        
+    # Remove any empty strings resulting from extra commas or poor input
+    flat_skills = [s for s in flat_skills if s]
+
+    # Use a set to remove duplicates, then convert back to a sorted list
+    return sorted(list(set(flat_skills)))
+
+
 def create_user(db: Session, user: schemas.UserCreate) -> Dict[str, Any]:
     """
-    Creates a new user or merges new skills if the user (identified by email) already exists.
-    Skills are robustly de-duplicated from the input and in the final response.
-    Core user data (username, location) is not updated for existing users.
+    Creates a new user or merges new skills, ensuring all skills are handled individually.
     """
     
-    # --- Input Cleaning: De-duplicate and Normalize Skills ---
-    # This removes any duplicates submitted in the user's input list.
-    user_skills = sorted(list(set(user.skills)))
+    # 💡 CRITICAL FIX: Clean and flatten the submitted skills list
+    user_skills = clean_and_flatten_skills(user.skills)
 
     # 1. Check for existing user by email
     existing_user_query = text("""
@@ -22,7 +38,7 @@ def create_user(db: Session, user: schemas.UserCreate) -> Dict[str, Any]:
 
     # Helper function to get skill_id
     def get_or_create_skill(skill_name: str) -> int:
-        # ON CONFLICT (skill_name) ensures no duplicate entries in the global 'skills' table.
+        # DB ensures no duplicate skill names in the global 'skills' table.
         skill_result = db.execute(text("""
             INSERT INTO skills (skill_name)
             VALUES (:skill_name)
@@ -33,6 +49,7 @@ def create_user(db: Session, user: schemas.UserCreate) -> Dict[str, Any]:
 
     # Helper function to get existing user skills
     def get_existing_skills(user_id: int) -> List[str]:
+        # This function is fine as it retrieves single skill names from the DB
         skills_query = text("""
             SELECT s.skill_name
             FROM user_skills us
@@ -46,14 +63,12 @@ def create_user(db: Session, user: schemas.UserCreate) -> Dict[str, Any]:
         # ** Existing User Found: Check and Merge Skills **
         user_id = existing_user_result.user_id
         
-        # Get current skills
         existing_skills = get_existing_skills(user_id)
         
         # Determine which skills are new for this user (using the cleaned input)
         new_skills_to_add = set(user_skills) - set(existing_skills)
         
         if not new_skills_to_add:
-            # User exists, and all submitted skills already exist for this user.
             db.rollback() 
             return {
                 "status_code": 409, 
@@ -65,8 +80,6 @@ def create_user(db: Session, user: schemas.UserCreate) -> Dict[str, Any]:
         for skill_name in new_skills_to_add:
             skill_id = get_or_create_skill(skill_name)
 
-            # ON CONFLICT (user_id, skill_id) DO NOTHING prevents duplicate entries 
-            # in the 'user_skills' mapping table.
             db.execute(text("""
                 INSERT INTO user_skills (user_id, skill_id)
                 VALUES (:user_id, :skill_id)
@@ -76,7 +89,6 @@ def create_user(db: Session, user: schemas.UserCreate) -> Dict[str, Any]:
         
         db.commit()
         
-        # --- Ensure the final list of skills for the response is de-duplicated ---
         # Combine existing and newly added skills using a set to eliminate any duplicates.
         final_skills_set = set(existing_skills)
         final_skills_set.update(added_skill_names)
@@ -87,11 +99,10 @@ def create_user(db: Session, user: schemas.UserCreate) -> Dict[str, Any]:
             "message": f"the previous skills are unchanged and the newly added skills are added: {', '.join(added_skill_names)}",
             "user_data": {
                 "user_id": user_id,
-                # Returning the existing data (No updates to core fields)
                 "username": existing_user_result.username, 
                 "email": existing_user_result.email,       
                 "location": existing_user_result.location, 
-                "skills": newly_updated_skills # Return the robustly de-duplicated list
+                "skills": newly_updated_skills 
             }
         }
 
@@ -113,7 +124,6 @@ def create_user(db: Session, user: schemas.UserCreate) -> Dict[str, Any]:
             user_id = db_user.user_id
         except Exception as e:
             db.rollback()
-            # Safety net for DB unique constraint violation if initial select somehow failed (race condition)
             if "duplicate key value violates unique constraint" in str(e):
                  return {
                     "status_code": 409, 
@@ -121,11 +131,10 @@ def create_user(db: Session, user: schemas.UserCreate) -> Dict[str, Any]:
                 }
             raise e
 
-        # 3. Insert skills and map to user (using the cleaned input)
+        # 3. Insert skills and map to user (using the cleaned, flattened input)
         for skill in user_skills:
             skill_id = get_or_create_skill(skill)
 
-            # Insert mapping into user_skills
             db.execute(text("""
                 INSERT INTO user_skills (user_id, skill_id)
                 VALUES (:user_id, :skill_id)
@@ -142,13 +151,12 @@ def create_user(db: Session, user: schemas.UserCreate) -> Dict[str, Any]:
                 "username": db_user.username,
                 "email": db_user.email,
                 "location": db_user.location,
-                # Return the already de-duplicated list
                 "skills": user_skills 
             }
         }
 
 def get_users(db: Session):
-    # This query retrieves all user data and skills
+    # This function remains correct for retrieving data that is already correctly stored.
     query = text("""
         SELECT u.user_id, u.username, u.email, u.location, s.skill_name
         FROM users u
@@ -168,7 +176,7 @@ def get_users(db: Session):
                 "location": row.location,
                 "skills": []
             }
-        # Only append the skill if it's not already in the list for this user (De-duplication in API output)
+        # De-duplication check for the final API output list
         if row.skill_name and row.skill_name not in users_dict[row.user_id]["skills"]:
             users_dict[row.user_id]["skills"].append(row.skill_name)
 
