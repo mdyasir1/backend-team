@@ -4,7 +4,7 @@ bcrypt==5.0.0
 certifi==2025.8.3
 click==8.1.8
 colorama==0.4.6
-dnspython==2.7.0          # downgraded from 2.8.0 to the latest available
+dnspython==2.7.0            # downgraded (2.8.0 not available)
 email-validator==2.3.0
 fastapi==0.118.0
 fastapi-cli==0.0.13
@@ -16,7 +16,7 @@ httptools==0.6.4
 httpx==0.28.1
 idna==3.10
 Jinja2==3.1.6
-markdown-it-py==4.0.0
+markdown-it-py==3.0.0       # downgraded (4.0.0 not available)
 MarkupSafe==3.0.3
 mdurl==0.1.2
 pydantic==2.11.9
