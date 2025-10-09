@@ -29,4 +29,4 @@ def read_users(db: Session = Depends(get_db)):
     return crud.get_users(db)
 
 if __name__ == '__main__':
-    uvicorn.run('main:app',host='0.0.0.0' , port=8000, reload=True)
+    uvicorn.run('main:app',host='0.0.0.0' , port=8000, reload=False)
