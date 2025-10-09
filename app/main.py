@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
-from app import schemas, crud
+import schemas
+import crud
 from app.database import SessionLocal
 import uvicorn
 # Initialize DB (recreate tables each run for testing)
