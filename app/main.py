@@ -4,8 +4,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from app import schemas, crud
 from app.database import SessionLocal
 import uvicorn
-from typing import Union
-
 # Initialize DB (recreate tables each run for testing)
 # init_db()
 
@@ -27,14 +25,13 @@ def get_db():
     finally:
         db.close()
 
-# Note: The response model is now schemas.SubmissionStatus to handle custom messages
 @app.post("/submit-form", response_model=schemas.SubmissionStatus)
 def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     try:
-        # crud.create_user now returns a dictionary with status_code, message, and optional user_data
+        # crud.create_user returns a dict with status_code and message
         result = crud.create_user(db, user)
         
-        if result.get("status_code") == 409: # User already exists with same data
+        if result.get("status_code") == 409: # User already exists with same data/skills
              raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=result.get("message")
@@ -47,10 +44,8 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
         }
         
     except HTTPException as e:
-        # Re-raise explicit HTTP exceptions (like the 409 above)
         raise e
     except Exception as e:
-        # Handle unexpected database or server errors
         db.rollback() 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
