@@ -1,9 +1,11 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
 from app import schemas, crud
 from app.database import SessionLocal
 import uvicorn
+from typing import Union
+
 # Initialize DB (recreate tables each run for testing)
 # init_db()
 
@@ -25,12 +27,35 @@ def get_db():
     finally:
         db.close()
 
-@app.post("/submit-form", response_model=schemas.UserResponse)
+# Note: The response model is now schemas.SubmissionStatus to handle custom messages
+@app.post("/submit-form", response_model=schemas.SubmissionStatus)
 def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     try:
-        return crud.create_user(db, user)
+        # crud.create_user now returns a dictionary with status_code, message, and optional user_data
+        result = crud.create_user(db, user)
+        
+        if result.get("status_code") == 409: # User already exists with same data
+             raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=result.get("message")
+            )
+        
+        # New or updated user
+        return {
+            "message": result.get("message"),
+            "user_data": result.get("user_data")
+        }
+        
+    except HTTPException as e:
+        # Re-raise explicit HTTP exceptions (like the 409 above)
+        raise e
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        # Handle unexpected database or server errors
+        db.rollback() 
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail=f"An error occurred during submission: {str(e)}"
+        )
 
 @app.get("/submissions", response_model=list[schemas.UserResponse])
 def read_users(db: Session = Depends(get_db)):

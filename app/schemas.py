@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr
-from typing import List
+from typing import List, Optional
 
 class UserCreate(BaseModel):
     username: str
@@ -13,3 +13,8 @@ class UserResponse(BaseModel):
     email: EmailStr
     location: str
     skills: List[str]
+
+# New schema for the custom response when submitting a form
+class SubmissionStatus(BaseModel):
+    message: str
+    user_data: Optional[UserResponse] = None # Optional user data for new/updated users
