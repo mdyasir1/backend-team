@@ -24,19 +24,21 @@ def clean_and_flatten_skills(skills: List[str]) -> List[str]:
 
 def create_user(db: Session, user: schemas.UserCreate) -> Dict[str, Any]:
     """
-    Creates a new user or merges new skills, ensuring all skills are handled individually.
+    Creates a new user, or merges skills only if the submitted core data 
+    (email, username, and location) matches the existing record.
     """
     
-    # 💡 CRITICAL FIX: Clean and flatten the submitted skills list
+    # 1. INPUT CLEANING: De-duplicate and Normalize Skills using a set
     user_skills = clean_and_flatten_skills(user.skills)
 
-    # 1. Check for existing user by email
+    # Check for existing user by email
     existing_user_query = text("""
         SELECT user_id, username, email, location FROM users WHERE email = :email;
     """)
     existing_user_result = db.execute(existing_user_query, {"email": user.email}).fetchone()
 
-    # Helper function to get skill_id
+    # Helper functions (omitted for brevity, they are the same as before)
+    # ...
     def get_or_create_skill(skill_name: str) -> int:
         # DB ensures no duplicate skill names in the global 'skills' table.
         skill_result = db.execute(text("""
@@ -47,9 +49,7 @@ def create_user(db: Session, user: schemas.UserCreate) -> Dict[str, Any]:
         """), {"skill_name": skill_name})
         return skill_result.fetchone().skill_id
 
-    # Helper function to get existing user skills
     def get_existing_skills(user_id: int) -> List[str]:
-        # This function is fine as it retrieves single skill names from the DB
         skills_query = text("""
             SELECT s.skill_name
             FROM user_skills us
@@ -57,18 +57,33 @@ def create_user(db: Session, user: schemas.UserCreate) -> Dict[str, Any]:
             WHERE us.user_id = :user_id;
         """)
         return [row.skill_name for row in db.execute(skills_query, {"user_id": user_id}).fetchall()]
+    # ...
 
 
     if existing_user_result:
-        # ** Existing User Found: Check and Merge Skills **
+        # ** Existing User Found: Check Core Data Match **
+        
+        # CRITICAL: Check if username AND location match the existing record
+        if (existing_user_result.username != user.username or 
+            existing_user_result.location != user.location):
+            
+            # Core data (username or location) does NOT match. Block the submission.
+            db.rollback() 
+            return {
+                "status_code": 409, 
+                "message": "user already exsits" # Blocking message for conflict
+            }
+
+        # Core data MATCHES. Proceed with Skill Merge logic.
         user_id = existing_user_result.user_id
         
         existing_skills = get_existing_skills(user_id)
         
-        # Determine which skills are new for this user (using the cleaned input)
+        # Determine which skills are new for this user
         new_skills_to_add = set(user_skills) - set(existing_skills)
         
         if not new_skills_to_add:
+            # User exists, and all submitted skills already exist for this user.
             db.rollback() 
             return {
                 "status_code": 409, 
@@ -131,7 +146,7 @@ def create_user(db: Session, user: schemas.UserCreate) -> Dict[str, Any]:
                 }
             raise e
 
-        # 3. Insert skills and map to user (using the cleaned, flattened input)
+        # 3. Insert skills and map to user (using the cleaned input)
         for skill in user_skills:
             skill_id = get_or_create_skill(skill)
 
@@ -156,7 +171,7 @@ def create_user(db: Session, user: schemas.UserCreate) -> Dict[str, Any]:
         }
 
 def get_users(db: Session):
-    # This function remains correct for retrieving data that is already correctly stored.
+    # This function is unchanged and correctly retrieves unique skills
     query = text("""
         SELECT u.user_id, u.username, u.email, u.location, s.skill_name
         FROM users u
