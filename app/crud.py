@@ -142,7 +142,7 @@ def create_user(db: Session, user: schemas.UserCreate) -> Dict[str, Any]:
             if "duplicate key value violates unique constraint" in str(e):
                  return {
                     "status_code": 409, 
-                    "message": "user already exsits"
+                    "message": "email already exsits"
                 }
             raise e
 
