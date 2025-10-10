@@ -87,7 +87,7 @@ def create_user(db: Session, user: schemas.UserCreate) -> Dict[str, Any]:
             db.rollback() 
             return {
                 "status_code": 409, 
-                "message": "user already exsits"
+                "message": "email already exsits"
             }
 
         # Add new skills only
