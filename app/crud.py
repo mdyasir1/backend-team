@@ -71,7 +71,7 @@ def create_user(db: Session, user: schemas.UserCreate) -> Dict[str, Any]:
             db.rollback() 
             return {
                 "status_code": 409, 
-                "message": "user already exsits" # Blocking message for conflict
+                "message": "email already exsits" # Blocking message for conflict
             }
 
         # Core data MATCHES. Proceed with Skill Merge logic.
@@ -87,7 +87,7 @@ def create_user(db: Session, user: schemas.UserCreate) -> Dict[str, Any]:
             db.rollback() 
             return {
                 "status_code": 409, 
-                "message": "email already exsits"
+                "message": "user already exsits"
             }
 
         # Add new skills only
